@@ -47,16 +47,29 @@ class MeetingConversationManager {
         }
       };
 
-      // Add initial participants
+      // SET THE MEETING STATE FIRST before adding participants
+      this.meetings.set(meetingId, meetingState);
+
+      // Add initial participants AFTER meeting state is created
       for (const participant of initialParticipants) {
-        await this.addParticipant(meetingId, participant, false);
+        try {
+          await this.addParticipant(meetingId, participant, false);
+        } catch (participantError) {
+          this.logger.warn('Failed to add initial participant:', {
+            meetingId,
+            participant: participant.id || participant.email,
+            error: participantError.message
+          });
+          // Continue with other participants even if one fails
+        }
       }
 
-      this.meetings.set(meetingId, meetingState);
+      // Update the meeting state after adding participants
+      const updatedState = this.meetings.get(meetingId);
 
       this.logger.info('Meeting initialized', {
         meetingId,
-        initialParticipantCount: initialParticipants.length
+        initialParticipantCount: updatedState.participants.size
       });
 
       return {
@@ -64,7 +77,7 @@ class MeetingConversationManager {
         meetingId,
         status: 'active',
         startTime: meetingState.startTime,
-        participantCount: initialParticipants.length
+        participantCount: updatedState.participants.size
       };
 
     } catch (error) {
